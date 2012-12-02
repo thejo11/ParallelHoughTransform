@@ -19,7 +19,7 @@ using std::ofstream;
 using std::endl;
 
 // Include global variables
-#define __MAIN 
+#define __MAIN
 #include "globals.h"
 #undef __MAIN
 
@@ -32,6 +32,9 @@ using std::endl;
 #define SERIAL       1
 #define BLOCKROW     2
 #define CHECKERBOARD 3
+
+#define PI 3.141592653
+#define OOB_TAN 263.0
 
 /**
  * prints local game field, including ghost cells
@@ -74,11 +77,9 @@ int main(int argc, char* argv[]) {
 	
     //set options for the game
     /* set to SERIAL, BLOCKROW, or CHECKERBOARD */
-    const int part_method = SERIAL; 
+    const int part_method = BLOCKROW;
     /* total iterations for simulation  */
     const int iterations = 1;
-    /* frequency at which to count bugs */
-    const int count_total_freq = 1;
     /* input file name */
     const char input_file_name[] = "vatican-city-900x600.pgm";
     
@@ -102,7 +103,7 @@ int main(int argc, char* argv[]) {
     }
     else {
         if( rank==0 )
-            pprintf("Error: unknown partitioning method %d\n", 
+            pprintf("Error: unknown partitioning method %d\n",
 					part_method );
         MPI_Finalize();
         return 1;
@@ -112,13 +113,13 @@ int main(int argc, char* argv[]) {
     if( np != nrows * ncols )
     {
         if( rank==0 )
-            pprintf("Error: %ix%i partitioning requires %i np (%i provided)\n", 
+            pprintf("Error: %ix%i partitioning requires %i np (%i provided)\n",
 					nrows, ncols, nrows * ncols, np );
         MPI_Finalize();
         return 1;
     }
 	
-    // Now, calculate neighbors (N, S, E, W, NW, NE, SW, SE)    
+    // Now, calculate neighbors (N, S, E, W, NW, NE, SW, SE)
     MPI_Comm cart_comm;
     int coords[2];
     int test_coords[2];
@@ -210,30 +211,6 @@ int main(int argc, char* argv[]) {
 	rows = out2.str();
 	header.append(rows);
 	header.append("\n255\n");
-	char *header2 = (char*)header.c_str();
-	
-    //
-    // Count the buggies. Note that we count from [1,1] - [height+1,width+1];
-    // we need to ignore the ghost row!
-    //
-    /*int i=0;
-	 for( int y=1; y<local_height+1; y++ )
-	 {
-	 for( int x=1; x<local_width+1; x++ )
-	 {
-	 if( field_a[ y * field_width + x ] == ALIVE )
-	 {
-	 i++;
-	 }
-	 }
-	 }*/
-	
-    int total;
-    //MPI_Allreduce( &i, &total, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD );
-	
-    unsigned char cell;
-    int num_neighbors = 0;
-    int local_left = 0;
 	
     /* assign 2d pointers to field_a */
     int **board_ptr_a = (int **) malloc(field_height * sizeof(int *));
@@ -248,30 +225,30 @@ int main(int argc, char* argv[]) {
 	
     /** column type */
     MPI_Datatype col_type;
-    MPI_Type_vector( local_height, 1, field_width, MPI_CHAR, &col_type);
+    MPI_Type_vector( local_height, 1, field_width, MPI_INT, &col_type);
     MPI_Type_commit(&col_type);
 	
     /**
      * Main game loop
      */
     int iteration;
-    for (iteration=1; iteration<=iterations && total>0; iteration++) {
+    for (iteration=1; iteration<=iterations; iteration++) {
 		
 		/**
 		 * send rows to neighbors, recv ghost rows
 		 */
 		MPI_Request requests[16];
 		//sending my top row to N
-		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], local_width, MPI_CHAR,
+		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], local_width, MPI_INT,
 				  N, 0, cart_comm, requests );
 		//recving my top ghost row from N
-		MPI_Irecv( &board_ptr_a[ 0 ][ 1 ], local_width, MPI_CHAR,
+		MPI_Irecv( &board_ptr_a[ 0 ][ 1 ], local_width, MPI_INT,
 				  N, 0, cart_comm, requests+1 );
 		//sending my bottom row to S
-		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], local_width, MPI_CHAR,
+		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], local_width, MPI_INT,
 				  S, 0, cart_comm, requests+2 );
 		//recving my bottom ghost row from S
-		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 1 ], local_width, MPI_CHAR,
+		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 1 ], local_width, MPI_INT,
 				  S, 0, cart_comm, requests+3 );
 		
 		//sending my left col to W
@@ -288,111 +265,119 @@ int main(int argc, char* argv[]) {
 				  E, 0, cart_comm, requests+7 );
 		
 		//sending my NW corner to NW
-		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], 1, MPI_CHAR,
+		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], 1, MPI_INT,
 				  NW, 0, cart_comm, requests+8 );
 		//recving my NW ghost corner from NW
-		MPI_Irecv( &board_ptr_a[ 0 ][ 0 ], 1, MPI_CHAR,
+		MPI_Irecv( &board_ptr_a[ 0 ][ 0 ], 1, MPI_INT,
 				  NW, 0, cart_comm, requests+9 );
 		//sending my NE corner to NE
-		MPI_Isend( &board_ptr_a[ 1 ][ field_width-2 ], 1, MPI_CHAR,
+		MPI_Isend( &board_ptr_a[ 1 ][ field_width-2 ], 1, MPI_INT,
 				  NE, 0, cart_comm, requests+10 );
 		//recving my NE ghost corner from NE
-		MPI_Irecv( &board_ptr_a[ 0 ][ field_width-1 ], 1, MPI_CHAR,
+		MPI_Irecv( &board_ptr_a[ 0 ][ field_width-1 ], 1, MPI_INT,
 				  NE, 0, cart_comm, requests+11 );
 		//sending my SW corner to SW
-		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], 1, MPI_CHAR,
+		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], 1, MPI_INT,
 				  SW, 0, cart_comm, requests+12 );
 		//recving my SW ghost corner from SW
-		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 0 ], 1, MPI_CHAR,
+		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 0 ], 1, MPI_INT,
 				  SW, 0, cart_comm, requests+13 );
 		//sending my SE corner to SE
-		MPI_Isend( &board_ptr_a[ field_height-2 ][ field_width-2 ], 1, MPI_CHAR,
+		MPI_Isend( &board_ptr_a[ field_height-2 ][ field_width-2 ], 1, MPI_INT,
 				  SE, 0, cart_comm, requests+14 );
 		//recving my SE ghost corner from SE
-		MPI_Irecv( &board_ptr_a[ field_height-1 ][ field_width-1 ], 1, MPI_CHAR,
+		MPI_Irecv( &board_ptr_a[ field_height-1 ][ field_width-1 ], 1, MPI_INT,
 				  SE, 0, cart_comm, requests+15 );
 		
 		MPI_Waitall( 16, requests, MPI_STATUSES_IGNORE );
 		
 		/**
-		 * update stencil section
+		 * Perform Hough transform
 		 */
-		/*local_left = 0; //keep running total
-		 for(int y=1; y<local_height+1; y++ ) {
-		 for(int x=1; x<local_width+1; x++ ) {*/
-		
-		/** counting neighbors */
-		/*num_neighbors = 0;
-		 // top of stencil
-		 if( board_ptr_a[ y-1 ][ x-1 ] == ALIVE ) num_neighbors++;
-		 if( board_ptr_a[ y-1 ][ x   ] == ALIVE ) num_neighbors++;
-		 if( board_ptr_a[ y-1 ][ x+1 ] == ALIVE ) num_neighbors++;
-		 // middle of stencil
-		 // cell_ptr = cell_ptr + field_width;
-		 if( board_ptr_a[ y   ][ x-1 ] == ALIVE ) num_neighbors++;
-		 if( board_ptr_a[ y   ][ x+1 ] == ALIVE ) num_neighbors++;
-		 // bottom of stencil
-		 // cell_ptr = cell_ptr + field_width;
-		 if( board_ptr_a[ y+1 ][ x-1 ] == ALIVE ) num_neighbors++;
-		 if( board_ptr_a[ y+1 ][ x   ] == ALIVE ) num_neighbors++;
-		 if( board_ptr_a[ y+1 ][ x+1 ] == ALIVE ) num_neighbors++;
-		 
-		 /** actual update section */
-		/*cell = board_ptr_a[ y ][ x ];
-		 
-		 if( num_neighbors < 2 || num_neighbors > 3 ) {
-		 board_ptr_b[ y ][ x ] = DEAD;
-		 }
-		 else if( num_neighbors == 3 ) {
-		 board_ptr_b[ y ][ x ] = ALIVE;
-		 local_left++;
-		 }
-		 else {
-		 board_ptr_b[ y ][ x ] = cell;
-		 if (cell == ALIVE) local_left++;
-		 }
-		 
-		 }
-		 } /** end update section */
-		
-		/** sum and print total bugs every count_total_freq iterations */
-		/*if (iteration % count_total_freq == 0) {
-#if defined(_DEBUG)
-			pprintf( "local number alive after update iteration %d: %d\n",
-					iteration, local_left );
-#endif
-			
-			/** get a board count */
-			/*MPI_Allreduce(&local_left, &total, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-			
-			if (rank == 0) {
-				pprintf( "Total number alive after iteration %d: %d\n",
-						iteration, total );
-			}
-		}*/
-		
-		/**
-		 * copy the updated field_b to field_a
-		 * (note: can avoid this copy by doing a pointer swap)
-		 */
-		memcpy ( field_a, field_b, field_width*field_height*sizeof(unsigned char) );
-		
+        long xEnd, yEnd;              /* end of image within borders */
+        long thetaHt, rhoWid;         /* width and height of Hough space */
+        long rhoWidM1;                /* rho width minus 1 */
+        double rho, theta;            /* radius and angle in Hough space */
+        double tanTheta;              /* tan of theta angle */
+        double denom;                 /* denominator */
+        double rhoNorm;               /* normalization factor for rho */
+        long max, xMax, yMax;         /* peak point in Hough space */
+        int width = local_width;
+        int height = local_height;
+        double x1, y1;
+        long j;
+        
+        rhoWid = width;
+        rhoWidM1 = width - 1;
+        thetaHt = height;
+        
+        rhoNorm = rhoWidM1 / sqrt((double) (width * width) + (double) height * height);
+        
+        yEnd = height;
+        xEnd = width;
+        
+        /*for(int y = 0; y < yEnd; y++){
+            for(int x = 0; x < xEnd; x++){
+                for(int i = 0; i < thetaHt; i++){
+                    theta = (double) i * PI / (double) thetaHt;
+                    tanTheta = tan(theta);
+                    if(tanTheta > OOB_TAN){
+                        rho = (double) x;
+                    }else{
+                        denom = tanTheta * tanTheta + 1.0;
+                        y1 = ((double) y - (double) x * tanTheta) / denom;
+                        x1 = ((double) x * tanTheta * tanTheta - (double) y * tanTheta) / denom;
+                        rho = sqrt(x1 * x1 + y1 * y1);
+                    }
+                    j = (long) (rho * rhoNorm + 0.5);
+                    if(board_ptr_b[i][j] < 255){
+                        board_ptr_b[i][j]++;
+                    }
+                }
+            }
+        }
+        
+        for(long i = 0; i < thetaHt; i++){
+            for(long j = 0; j < rhoWid; j++){
+                board_ptr_b[i][j] = 255 - board_ptr_b[i][j];
+            }
+        }*/
+        
     }
-	
-	char fileName[13] = "output";
-	strcat(fileName, ".pgm");
-	
-	ofstream outdata;
+    
+    //MPI_Isend( &board_ptr_a[1][0], (field_width*field_height)-(field_width*2), ///MPI_INT, 0, 0, cart_comm, 0 );
+    
 	if(rank == 0){
+        
+        int *final_data = (int*)malloc((local_height*nrows)*(local_width*ncols));
+        
+        final_data = &board_ptr_b[1][0];
+        
+        //MPI_Irecv( &final_data[local_height*local_width], (field_width*field_height)-(field_width*2), MPI_INT, 1, 0, cart_comm, 0 );
+        
+        char fileName[13] = "output";
+        strcat(fileName, ".pgm");
+        
+        ofstream outdata;
 		
 		outdata.open(fileName);
 		
 		outdata << header;
-		
-		for(int i = 0; i < local_height*local_width; i++){
-			outdata << field_a[i] << endl;
-		}
+        
+        for(int i = 0; i < (local_height*nrows)*(local_width*ncols); i++){
+            outdata << final_data[i] << endl;
+        }
+        
+        /*for(long i = 0; i < field_height; i++){
+            for(long j = 0; j < field_width; j++){
+                outdata << board_ptr_a[i][j] << endl;
+            }
+        }*/
+        
+        
+        
 		outdata.close();
+        free(fileName);
 	}
 	
     // free the board pointers
@@ -408,4 +393,4 @@ int main(int argc, char* argv[]) {
         pprintf( "Terminating normally\n" );
     MPI_Finalize();
     return 0;
-} 
+}

@@ -61,10 +61,10 @@ bool readpgm( const char *filename )
         pprintf( "%s: %s %i %i %i\n", filename, header, width, height, depth );
 	
     // Make sure the header is valid
-    if( strcmp( header, "P5") )
+    if( strcmp( header, "P2") )
     {
         if(rank==0) 
-            pprintf( "Error: PGM file is not a valid P5 pixmap.\n" );
+            pprintf( "Error: PGM file is not a valid P2 pixmap.\n" );
         return false;
     }
     if( depth != 255 )
@@ -115,7 +115,7 @@ bool readpgm( const char *filename )
     field_width = local_width + 2;
     field_height = local_height + 2;
     field_a = (int *)malloc(field_width * field_height * sizeof(int));
-    field_b = (int *)malloc(field_width * field_height * sizeof(int));
+	field_b = (int *)malloc(field_width * field_height * sizeof(int));
 	
     // start with completely blank board
     for (int y=0; y<field_width*field_height; y++) {
@@ -153,7 +153,6 @@ bool readpgm( const char *filename )
 					ly = y - start_y;
 					ll = (ly * local_width + lx );
 					field_a[ ll ] = b;
-					field_b[ ll ] = b;
 				} // save local point
 				
 			} // for x
