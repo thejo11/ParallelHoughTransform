@@ -12,6 +12,6 @@
 *.la
 *.a
 
-output.pgm
+output*.pgm
 pHough
 *~

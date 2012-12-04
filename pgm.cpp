@@ -61,7 +61,7 @@ bool readpgm( const char *filename )
         pprintf( "%s: %s %i %i %i\n", filename, header, width, height, depth );
 	
     // Make sure the header is valid
-    if( strcmp( header, "P2") )
+    if( strcmp( header, "P5") )
     {
         if(rank==0) 
             pprintf( "Error: PGM file is not a valid P2 pixmap.\n" );
@@ -132,17 +132,18 @@ bool readpgm( const char *filename )
 	std::ifstream myfile(filename);
 	
 	if(myfile.is_open()){
+		/*getline(myfile, line);
 		getline(myfile, line);
-		getline(myfile, line);
-		getline(myfile, line);
+		getline(myfile, line);*/
 		for( int y=0; y<height; y++ )
 		{
 			for( int x=0; x<width; x++ )
 			{
 				// Read the next number
-				getline(myfile, oldB);
+				//getline(myfile, oldB);
 				
-				b = atoi(oldB.c_str());
+				//b = atoi(oldB.c_str());
+				b = fgetc(fp);
 				
 				// If the character is local, then save it!
 				if( x >= start_x && x < start_x + local_width &&

@@ -60,6 +60,8 @@ void print_local_field(unsigned char *local_field) {
 // main
 //
 int main(int argc, char* argv[]) {
+    
+    int gsizes[2], distribs[2], dargs[2], psizes[2];
 	
     // Initialize MPI
     MPI_Init(&argc, &argv);
@@ -81,7 +83,7 @@ int main(int argc, char* argv[]) {
     /* total iterations for simulation  */
     const int iterations = 1;
     /* input file name */
-    const char input_file_name[] = "vatican-city-900x600.pgm";
+    const char input_file_name[] = "vatican-city2.pgm";
     
     //
     // Determine the partitioning
@@ -197,8 +199,33 @@ int main(int argc, char* argv[]) {
         MPI_Finalize();
         return 1;
     }
+    
+    MPI_Datatype datatype;
+    MPI_Type_vector(local_height, local_width, field_width, MPI_CHAR, &datatype);
+    
+    MPI_Datatype filetype;
+    
+    gsizes[0] = local_height*nrows;
+	gsizes[1] = local_width*ncols;
+    
+    printf("local_width: %d, local_height: %d, nrows: %d, ncols: %d\n", local_width, local_height, nrows, ncols);
+    printf("field_width: %d, field_height: %d\n", field_width, field_height);
+    fflush(stdout);
 	
-	std::string header = ("P2\n");
+	distribs[0] = MPI_DISTRIBUTE_BLOCK;
+	distribs[1] = MPI_DISTRIBUTE_BLOCK;
+    
+	dargs[0] = MPI_DISTRIBUTE_DFLT_DARG;
+	dargs[1] = MPI_DISTRIBUTE_DFLT_DARG;
+	
+	psizes[0] = nrows;
+	psizes[1] = ncols;
+	
+	MPI_Type_create_darray(np, rank, 2, gsizes, distribs, dargs,
+						   psizes, MPI_ORDER_C, MPI_CHAR, &filetype);
+	MPI_Type_commit(&filetype);
+	
+	std::string header = ("P5\n");
 	std::string cols;
 	std::stringstream out1;
 	out1 << local_width*ncols;
@@ -211,6 +238,9 @@ int main(int argc, char* argv[]) {
 	rows = out2.str();
 	header.append(rows);
 	header.append("\n255\n");
+    char *header2 = (char*)header.c_str();
+    
+    int offset = strlen(header2);
 	
     /* assign 2d pointers to field_a */
     int **board_ptr_a = (int **) malloc(field_height * sizeof(int *));
@@ -345,15 +375,54 @@ int main(int argc, char* argv[]) {
         
     }
     
-    //MPI_Isend( &board_ptr_a[1][0], (field_width*field_height)-(field_width*2), ///MPI_INT, 0, 0, cart_comm, 0 );
+    unsigned char *final_data = ( unsigned char*)malloc(field_width*field_height*sizeof(unsigned char));
     
-	if(rank == 0){
-        
-        int *final_data = (int*)malloc((local_height*nrows)*(local_width*ncols));
-        
-        final_data = &board_ptr_b[1][0];
-        
-        //MPI_Irecv( &final_data[local_height*local_width], (field_width*field_height)-(field_width*2), MPI_INT, 1, 0, cart_comm, 0 );
+    for(int i = 0; i < field_height; i++){
+        for(int j = 0; j < field_width; j++){
+            final_data[(i*field_width)+j] = (unsigned char)board_ptr_a[i][j];
+        }
+    }
+    
+    MPI_File file;
+    char fileName[13] = "output";
+    char intString[3];
+    sprintf(intString, "%d", 1);
+    strcat(fileName, intString);
+    strcat(fileName, ".pgm");
+    
+    MPI_File_open(MPI_COMM_WORLD, fileName,
+                  MPI_MODE_RDWR | MPI_MODE_CREATE,
+                  MPI_INFO_NULL, &file);
+    if(rank == 0){
+        //First write header to file
+        MPI_File_write(file, header2, offset, MPI_CHAR, MPI_STATUS_IGNORE);
+    }
+    
+    MPI_File_set_view(file, offset, MPI_CHAR, filetype, "native", MPI_INFO_NULL);
+    
+    MPI_File_write_all(file, &(final_data[1+field_width]) , 1,
+                       datatype, MPI_STATUS_IGNORE);
+    
+    MPI_File_close(&file);
+    
+    /*MPI_File file;
+    
+    MPI_File_open(MPI_COMM_WORLD, "output.pgm", MPI_MODE_RDWR | MPI_MODE_CREATE,
+                  MPI_INFO_NULL, &file);
+    if(rank == 0){
+        //MPI_File_set_view(file, 0, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL);
+        //First write header to file
+        MPI_File_write(file, header2, offset, MPI_CHAR, MPI_STATUS_IGNORE);
+    }
+    
+    MPI_File_set_view(file, offset+(rank*(field_height*field_width)), MPI_INT, MPI_INT, "native", MPI_INFO_NULL);
+    MPI_File_set_atomicity(file, 1);
+    MPI_File_write_at(file, 0, final_data, local_height*local_width, MPI_INT, 0);
+    MPI_File_close(&file);*/
+                      
+    
+    
+	/*if(rank == 0){
         
         char fileName[13] = "output";
         strcat(fileName, ".pgm");
@@ -364,21 +433,21 @@ int main(int argc, char* argv[]) {
 		
 		outdata << header;
         
-        for(int i = 0; i < (local_height*nrows)*(local_width*ncols); i++){
+        /*for(int i = 0; i < (local_height*nrows)*(local_width*ncols); i++){
             outdata << final_data[i] << endl;
-        }
-        
-        /*for(long i = 0; i < field_height; i++){
+        }*/
+    
+        /*for(long i = 1; i < field_height-1; i++){
             for(long j = 0; j < field_width; j++){
                 outdata << board_ptr_a[i][j] << endl;
             }
-        }*/
+        }
         
         
         
 		outdata.close();
         free(fileName);
-	}
+	}*/
 	
     // free the board pointers
     if( board_ptr_a != NULL ) free( board_ptr_a );
