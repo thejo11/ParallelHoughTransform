@@ -103,7 +103,7 @@ bool readpgm( const char *filename )
     local_width = width / ncols;
     local_height = height / nrows;
 	
-    // Find out where my starting range it
+    // Find out where my starting range is
     int start_x = local_width * my_col;
     int start_y = local_height * my_row;
 	
@@ -127,42 +127,30 @@ bool readpgm( const char *filename )
     // Read the data from the file. Save the local data to the local array.
     //
     int b, ll, lx, ly;
-	std::string oldB;
-	std::string line;
-	std::ifstream myfile(filename);
 	
-	if(myfile.is_open()){
-		/*getline(myfile, line);
-		getline(myfile, line);
-		getline(myfile, line);*/
-		for( int y=0; y<height; y++ )
+	for( int y=0; y<height; y++ )
+	{
+		for( int x=0; x<width; x++ )
 		{
-			for( int x=0; x<width; x++ )
+			b = fgetc(fp);
+			
+			// If the character is local, then save it!
+			if( x >= start_x && x < start_x + local_width &&
+			   y >= start_y && y < start_y + local_height )
 			{
-				// Read the next number
-				//getline(myfile, oldB);
-				
-				//b = atoi(oldB.c_str());
-				b = fgetc(fp);
-				
-				// If the character is local, then save it!
-				if( x >= start_x && x < start_x + local_width &&
-				   y >= start_y && y < start_y + local_height )
-				{
-					// Calculate the local pixels (+1 for ghost row,col)
-					lx = x - start_x;
-					ly = y - start_y;
-					ll = (ly * local_width + lx );
-					field_a[ ll ] = b;
-				} // save local point
-				
-			} // for x
-		} // for y
-	}
-	   
-	   fclose( fp );
-	   
-	   pp_reset_banner();
-	   return true;
-	   
-	   }
+				// Calculate the local pixels (+1 for ghost row,col)
+				lx = x - start_x + 1;
+				ly = y - start_y + 1;
+				ll = (ly * field_width + lx );
+				field_a[ ll ] = b;
+			} // save local point
+			
+		} // for x
+	} // for y
+	
+	fclose( fp );
+	
+	pp_reset_banner();
+	return true;
+	
+}

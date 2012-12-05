@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
     /* total iterations for simulation  */
     const int iterations = 1;
     /* input file name */
-    const char input_file_name[] = "vatican-city2.pgm";
+    const char input_file_name[] = "vatican-city-900x600.pgm";
     
     //
     // Determine the partitioning
@@ -201,16 +201,12 @@ int main(int argc, char* argv[]) {
     }
     
     MPI_Datatype datatype;
-    MPI_Type_vector(local_height, local_width, field_width, MPI_CHAR, &datatype);
+    MPI_Type_vector(local_height, local_width, local_width, MPI_CHAR, &datatype);
     
     MPI_Datatype filetype;
     
     gsizes[0] = local_height*nrows;
 	gsizes[1] = local_width*ncols;
-    
-    printf("local_width: %d, local_height: %d, nrows: %d, ncols: %d\n", local_width, local_height, nrows, ncols);
-    printf("field_width: %d, field_height: %d\n", field_width, field_height);
-    fflush(stdout);
 	
 	distribs[0] = MPI_DISTRIBUTE_BLOCK;
 	distribs[1] = MPI_DISTRIBUTE_BLOCK;
@@ -346,7 +342,7 @@ int main(int argc, char* argv[]) {
         yEnd = height;
         xEnd = width;
         
-        /*for(int y = 0; y < yEnd; y++){
+        for(int y = 0; y < yEnd; y++){
             for(int x = 0; x < xEnd; x++){
                 for(int i = 0; i < thetaHt; i++){
                     theta = (double) i * PI / (double) thetaHt;
@@ -371,15 +367,15 @@ int main(int argc, char* argv[]) {
             for(long j = 0; j < rhoWid; j++){
                 board_ptr_b[i][j] = 255 - board_ptr_b[i][j];
             }
-        }*/
+        }
         
     }
+	
+	unsigned char *final_data = (unsigned char*)malloc(local_width*local_height*sizeof(unsigned char));
     
-    unsigned char *final_data = ( unsigned char*)malloc(field_width*field_height*sizeof(unsigned char));
-    
-    for(int i = 0; i < field_height; i++){
-        for(int j = 0; j < field_width; j++){
-            final_data[(i*field_width)+j] = (unsigned char)board_ptr_a[i][j];
+    for(int i = 0; i < local_height; i++){
+        for(int j = 0; j < local_width; j++){
+            final_data[(i*local_width)+j] = (unsigned char)board_ptr_b[i+1][j+1];
         }
     }
     
@@ -400,7 +396,7 @@ int main(int argc, char* argv[]) {
     
     MPI_File_set_view(file, offset, MPI_CHAR, filetype, "native", MPI_INFO_NULL);
     
-    MPI_File_write_all(file, &(final_data[1+field_width]) , 1,
+    MPI_File_write_all(file, final_data , 1,
                        datatype, MPI_STATUS_IGNORE);
     
     MPI_File_close(&file);
