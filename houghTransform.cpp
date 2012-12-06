@@ -10,6 +10,11 @@
 #include <string.h>
 #include <sstream>
 #include <math.h>
+
+//OpenCV includes
+#include <cv.h>
+#include <highgui.h>
+
 #include "mpi.h"
 
 #include <fstream>
@@ -33,28 +38,6 @@ using std::endl;
 #define BLOCKROW     2
 #define CHECKERBOARD 3
 
-#define PI 3.141592653
-#define OOB_TAN 263.0
-
-/**
- * prints local game field, including ghost cells
- * (should only be used with small boards)
- */
-void print_local_field(unsigned char *local_field) {
-	for (int r=0; r<np; r++) {
-		if (rank == r) {
-			pprintf("local field\n");
-			for (int y=0; y<field_height; y++) {
-				for (int x=0; x<field_width; x++) {
-					printf("%2x ", local_field[ y*field_width + x ]);
-				}
-				printf("\n");
-			}
-		}
-		fflush(stdout);
-		MPI_Barrier(MPI_COMM_WORLD);  //forces serialized printing
-	}
-}
 
 //
 // main
@@ -83,7 +66,7 @@ int main(int argc, char* argv[]) {
     /* total iterations for simulation  */
     const int iterations = 1;
     /* input file name */
-    const char input_file_name[] = "vatican-city-900x600.pgm";
+    const char input_file_name[] = "test-500x500.pgm";
     
     //
     // Determine the partitioning
@@ -320,55 +303,7 @@ int main(int argc, char* argv[]) {
 		/**
 		 * Perform Hough transform
 		 */
-        long xEnd, yEnd;              /* end of image within borders */
-        long thetaHt, rhoWid;         /* width and height of Hough space */
-        long rhoWidM1;                /* rho width minus 1 */
-        double rho, theta;            /* radius and angle in Hough space */
-        double tanTheta;              /* tan of theta angle */
-        double denom;                 /* denominator */
-        double rhoNorm;               /* normalization factor for rho */
-        long max, xMax, yMax;         /* peak point in Hough space */
-        int width = local_width;
-        int height = local_height;
-        double x1, y1;
-        long j;
-        
-        rhoWid = width;
-        rhoWidM1 = width - 1;
-        thetaHt = height;
-        
-        rhoNorm = rhoWidM1 / sqrt((double) (width * width) + (double) height * height);
-        
-        yEnd = height;
-        xEnd = width;
-        
-        for(int y = 0; y < yEnd; y++){
-            for(int x = 0; x < xEnd; x++){
-                for(int i = 0; i < thetaHt; i++){
-                    theta = (double) i * PI / (double) thetaHt;
-                    tanTheta = tan(theta);
-                    if(tanTheta > OOB_TAN){
-                        rho = (double) x;
-                    }else{
-                        denom = tanTheta * tanTheta + 1.0;
-                        y1 = ((double) y - (double) x * tanTheta) / denom;
-                        x1 = ((double) x * tanTheta * tanTheta - (double) y * tanTheta) / denom;
-                        rho = sqrt(x1 * x1 + y1 * y1);
-                    }
-                    j = (long) (rho * rhoNorm + 0.5);
-                    if(board_ptr_b[i][j] < 255){
-                        board_ptr_b[i][j]++;
-                    }
-                }
-            }
-        }
-        
-        for(long i = 0; i < thetaHt; i++){
-            for(long j = 0; j < rhoWid; j++){
-                board_ptr_b[i][j] = 255 - board_ptr_b[i][j];
-            }
-        }
-        
+	 
     }
 	
 	unsigned char *final_data = (unsigned char*)malloc(local_width*local_height*sizeof(unsigned char));
@@ -400,50 +335,6 @@ int main(int argc, char* argv[]) {
                        datatype, MPI_STATUS_IGNORE);
     
     MPI_File_close(&file);
-    
-    /*MPI_File file;
-    
-    MPI_File_open(MPI_COMM_WORLD, "output.pgm", MPI_MODE_RDWR | MPI_MODE_CREATE,
-                  MPI_INFO_NULL, &file);
-    if(rank == 0){
-        //MPI_File_set_view(file, 0, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL);
-        //First write header to file
-        MPI_File_write(file, header2, offset, MPI_CHAR, MPI_STATUS_IGNORE);
-    }
-    
-    MPI_File_set_view(file, offset+(rank*(field_height*field_width)), MPI_INT, MPI_INT, "native", MPI_INFO_NULL);
-    MPI_File_set_atomicity(file, 1);
-    MPI_File_write_at(file, 0, final_data, local_height*local_width, MPI_INT, 0);
-    MPI_File_close(&file);*/
-                      
-    
-    
-	/*if(rank == 0){
-        
-        char fileName[13] = "output";
-        strcat(fileName, ".pgm");
-        
-        ofstream outdata;
-		
-		outdata.open(fileName);
-		
-		outdata << header;
-        
-        /*for(int i = 0; i < (local_height*nrows)*(local_width*ncols); i++){
-            outdata << final_data[i] << endl;
-        }*/
-    
-        /*for(long i = 1; i < field_height-1; i++){
-            for(long j = 0; j < field_width; j++){
-                outdata << board_ptr_a[i][j] << endl;
-            }
-        }
-        
-        
-        
-		outdata.close();
-        free(fileName);
-	}*/
 	
     // free the board pointers
     if( board_ptr_a != NULL ) free( board_ptr_a );

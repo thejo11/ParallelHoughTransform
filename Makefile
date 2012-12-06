@@ -28,15 +28,8 @@
 CC = mpicc
 CXX = mpicxx
 
-CFLAGS = -g -Wall -shared-intel -DMPICH_IGNORE_CXX_SEEK 
+CFLAGS = -g -Wall -shared-intel -DMPICH_IGNORE_CXX_SEEK -I /usr/local/include/opencv -L /usr/local/lib -lopencv_highgui -lopencv_core -lopencv_imgproc
 CXXFLAGS = $(CFLAGS)
-
-#
-# MPI Library
-#
-#CFLAGS = -I/opt/mpich-xl64/include -q64
-#CXXFLAGS = -I/opt/mpich-xl64/include -q64
-#LDFLAGS = -L/opt/mpich-xl64/lib -lmpich -q64
 
 ########################################################################### 
 #
