@@ -43,8 +43,8 @@ int local_height;
 // Local physical field size
 int field_width;        // Width and height of field on this processor
 int field_height;       // (should be local_width+2, local_height+2)
-int *field_a = NULL;      // The local data fields
-int *field_b = NULL;
+unsigned char *field_a = NULL;      // The local data fields
+unsigned char *field_b = NULL;
 
 #else
 extern int nrows;   
@@ -57,8 +57,8 @@ extern int local_height;
 
 extern int field_width;
 extern int field_height;
-extern int *field_a;
-extern int *field_b;
+extern unsigned char *field_a;
+extern unsigned char *field_b;
 
 #endif
 

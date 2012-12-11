@@ -56,7 +56,7 @@ pHough: $(O_FILES)
 #
 .PHONY: clean
 clean:		
-	/bin/rm -f core $(O_FILES) pHough output.pgm
+	/bin/rm -f core $(O_FILES) pHough output* tempOut*
 
 #
 # Dependencies

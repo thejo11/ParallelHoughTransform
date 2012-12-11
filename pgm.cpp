@@ -64,7 +64,7 @@ bool readpgm( const char *filename )
     if( strcmp( header, "P5") )
     {
         if(rank==0) 
-            pprintf( "Error: PGM file is not a valid P2 pixmap.\n" );
+            pprintf( "Error: PGM file is not a valid P5 pixmap.\n" );
         return false;
     }
     if( depth != 255 )
@@ -114,8 +114,8 @@ bool readpgm( const char *filename )
     // Create the array!
     field_width = local_width + 2;
     field_height = local_height + 2;
-    field_a = (int *)malloc(field_width * field_height * sizeof(int));
-	field_b = (int *)malloc(field_width * field_height * sizeof(int));
+    field_a = (unsigned char *)malloc(field_width * field_height * sizeof(unsigned char));
+	field_b = (unsigned char *)malloc(field_width * field_height * sizeof(unsigned char));
 	
     // start with completely blank board
     for (int y=0; y<field_width*field_height; y++) {
@@ -133,6 +133,11 @@ bool readpgm( const char *filename )
 		for( int x=0; x<width; x++ )
 		{
 			b = fgetc(fp);
+			if( b == EOF )
+            {
+                pprintf( "Error: Encountered EOF at [%i,%i]\n", y,x );
+                return false;
+            }
 			
 			// If the character is local, then save it!
 			if( x >= start_x && x < start_x + local_width &&

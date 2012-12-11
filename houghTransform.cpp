@@ -43,8 +43,6 @@ using std::endl;
 // main
 //
 int main(int argc, char* argv[]) {
-    
-    int gsizes[2], distribs[2], dargs[2], psizes[2];
 	
     // Initialize MPI
     MPI_Init(&argc, &argv);
@@ -184,9 +182,11 @@ int main(int argc, char* argv[]) {
     }
     
     MPI_Datatype datatype;
-    MPI_Type_vector(local_height, local_width, local_width, MPI_CHAR, &datatype);
+    MPI_Type_vector(local_height, local_width, field_width, MPI_CHAR, &datatype);
     
     MPI_Datatype filetype;
+	
+	int gsizes[2], distribs[2], dargs[2], psizes[2];
     
     gsizes[0] = local_height*nrows;
 	gsizes[1] = local_width*ncols;
@@ -222,19 +222,21 @@ int main(int argc, char* argv[]) {
     int offset = strlen(header2);
 	
     /* assign 2d pointers to field_a */
-    int **board_ptr_a = (int **) malloc(field_height * sizeof(int *));
+    unsigned char **board_ptr_a = (unsigned char **) malloc(field_height * sizeof(unsigned char *));
     for (int i=0; i < field_height; i++) {
 		board_ptr_a[i] = field_a + (i*field_width);
     }
     /* assign 2d pointers to field_b */
-    int **board_ptr_b = (int **) malloc(field_height * sizeof(int *));
+    unsigned char **board_ptr_b = (unsigned char **) malloc(field_height * sizeof(unsigned char *));
     for (int i=0; i < field_height; i++) {
 		board_ptr_b[i] = field_b + (i * field_width);
     }
 	
+	unsigned char *final_data = (unsigned char*)malloc(field_width*field_height*sizeof(unsigned char));
+	
     /** column type */
     MPI_Datatype col_type;
-    MPI_Type_vector( local_height, 1, field_width, MPI_INT, &col_type);
+    MPI_Type_vector( local_height, 1, field_width, MPI_CHAR, &col_type);
     MPI_Type_commit(&col_type);
 	
     /**
@@ -248,16 +250,16 @@ int main(int argc, char* argv[]) {
 		 */
 		MPI_Request requests[16];
 		//sending my top row to N
-		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], local_width, MPI_INT,
+		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], local_width, MPI_CHAR,
 				  N, 0, cart_comm, requests );
 		//recving my top ghost row from N
-		MPI_Irecv( &board_ptr_a[ 0 ][ 1 ], local_width, MPI_INT,
+		MPI_Irecv( &board_ptr_a[ 0 ][ 1 ], local_width, MPI_CHAR,
 				  N, 0, cart_comm, requests+1 );
 		//sending my bottom row to S
-		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], local_width, MPI_INT,
+		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], local_width, MPI_CHAR,
 				  S, 0, cart_comm, requests+2 );
 		//recving my bottom ghost row from S
-		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 1 ], local_width, MPI_INT,
+		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 1 ], local_width, MPI_CHAR,
 				  S, 0, cart_comm, requests+3 );
 		
 		//sending my left col to W
@@ -274,28 +276,28 @@ int main(int argc, char* argv[]) {
 				  E, 0, cart_comm, requests+7 );
 		
 		//sending my NW corner to NW
-		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], 1, MPI_INT,
+		MPI_Isend( &board_ptr_a[ 1 ][ 1 ], 1, MPI_CHAR,
 				  NW, 0, cart_comm, requests+8 );
 		//recving my NW ghost corner from NW
-		MPI_Irecv( &board_ptr_a[ 0 ][ 0 ], 1, MPI_INT,
+		MPI_Irecv( &board_ptr_a[ 0 ][ 0 ], 1, MPI_CHAR,
 				  NW, 0, cart_comm, requests+9 );
 		//sending my NE corner to NE
-		MPI_Isend( &board_ptr_a[ 1 ][ field_width-2 ], 1, MPI_INT,
+		MPI_Isend( &board_ptr_a[ 1 ][ field_width-2 ], 1, MPI_CHAR,
 				  NE, 0, cart_comm, requests+10 );
 		//recving my NE ghost corner from NE
-		MPI_Irecv( &board_ptr_a[ 0 ][ field_width-1 ], 1, MPI_INT,
+		MPI_Irecv( &board_ptr_a[ 0 ][ field_width-1 ], 1, MPI_CHAR,
 				  NE, 0, cart_comm, requests+11 );
 		//sending my SW corner to SW
-		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], 1, MPI_INT,
+		MPI_Isend( &board_ptr_a[ field_height-2 ][ 1 ], 1, MPI_CHAR,
 				  SW, 0, cart_comm, requests+12 );
 		//recving my SW ghost corner from SW
-		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 0 ], 1, MPI_INT,
+		MPI_Irecv( &board_ptr_a[ field_height-1 ][ 0 ], 1, MPI_CHAR,
 				  SW, 0, cart_comm, requests+13 );
 		//sending my SE corner to SE
-		MPI_Isend( &board_ptr_a[ field_height-2 ][ field_width-2 ], 1, MPI_INT,
+		MPI_Isend( &board_ptr_a[ field_height-2 ][ field_width-2 ], 1, MPI_CHAR,
 				  SE, 0, cart_comm, requests+14 );
 		//recving my SE ghost corner from SE
-		MPI_Irecv( &board_ptr_a[ field_height-1 ][ field_width-1 ], 1, MPI_INT,
+		MPI_Irecv( &board_ptr_a[ field_height-1 ][ field_width-1 ], 1, MPI_CHAR,
 				  SE, 0, cart_comm, requests+15 );
 		
 		MPI_Waitall( 16, requests, MPI_STATUSES_IGNORE );
@@ -303,16 +305,118 @@ int main(int argc, char* argv[]) {
 		/**
 		 * Perform Hough transform
 		 */
-	 
+		
+		
+		//First write rank's part of image to file
+		MPI_File tempOutFile;
+		char fileName[13] = "tempOut";
+		char intString[3];
+		sprintf(intString, "%d", rank);
+		strcat(fileName, intString);
+		strcat(fileName, ".pgm");
+		
+		MPI_File_open(MPI_COMM_SELF, fileName,
+					  MPI_MODE_RDWR | MPI_MODE_CREATE,
+					  MPI_INFO_NULL, &tempOutFile);
+		
+		std::string tempHeader = ("P5\n");
+		std::string tempCols;
+		std::stringstream tempOut1;
+		tempOut1 << local_width;
+		tempCols = tempOut1.str();
+		tempHeader.append(tempCols);
+		tempHeader.append(" ");
+		std::string tempRows;
+		std::stringstream tempOut2;
+		tempOut2 << local_height;
+		tempRows = tempOut2.str();
+		tempHeader.append(tempRows);
+		tempHeader.append("\n255\n");
+		char *tempHeader2 = (char*)tempHeader.c_str();
+		
+		int tempOffset = strlen(tempHeader2);
+		
+		MPI_File_write(tempOutFile, tempHeader2, tempOffset, MPI_CHAR, MPI_STATUS_IGNORE);
+		
+		MPI_File_set_view(tempOutFile, tempOffset, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL);
+		
+		MPI_File_write(tempOutFile, &field_a[field_width+1], 1, datatype, MPI_STATUS_IGNORE);
+		
+		MPI_File_close(&tempOutFile);
+		
+		//Next do the Canney and Hough transforms on the smaller image
+		IplImage* src;
+		src=cvLoadImage(fileName, 0);
+		IplImage* dst = cvCreateImage( cvGetSize(src), 8, 1 );
+		IplImage* color_dst = cvCreateImage( cvGetSize(src), 8, 3 );
+		IplImage* final_dst = cvCreateImage( cvGetSize(src), 8, 1 );
+		CvMemStorage* storage = cvCreateMemStorage(0);
+		CvSeq* lines = 0;
+		int i;
+		cvCanny( src, dst, 50, 200, 3 );
+		cvCvtColor( dst, color_dst, CV_GRAY2BGR );
+		lines = cvHoughLines2( dst,
+							  storage,
+							  CV_HOUGH_STANDARD,
+							  1,
+							  CV_PI/180,
+							  100,
+							  0,
+							  0 );
+		
+		for( i = 0; i < MIN(lines->total,100); i++ )
+        {
+			float* line = (float*)cvGetSeqElem(lines,i);
+			float rho = line[0];
+			float theta = line[1];
+			CvPoint pt1, pt2;
+			double a = cos(theta), b = sin(theta);
+			double x0 = a*rho, y0 = b*rho;
+			pt1.x = cvRound(x0 + 1000*(-b));
+			pt1.y = cvRound(y0 + 1000*(a));
+			pt2.x = cvRound(x0 - 1000*(-b));
+			pt2.y = cvRound(y0 - 1000*(a));
+			cvLine( color_dst, pt1, pt2, CV_RGB(255,0,0), 2, 8 );
+        }
+		
+		cvCvtColor(color_dst, final_dst, CV_BGR2GRAY);
+		
+		cvSaveImage(fileName, final_dst);
+		
+		FILE *fp = fopen( fileName, "r" );
+		char header[10];
+		int width, height, depth;
+		fscanf( fp, "%6s\n%i %i\n%i\n", header, &width, &height, &depth );
+		
+		//clear array
+		for (int y=0; y<field_width*field_height; y++) {
+			*(final_data + y) = 0;
+		}
+		
+		int b, ll, lx, ly;
+		
+		for( int y=0; y<height; y++ )
+		{
+			for( int x=0; x<width; x++ )
+			{
+				b = fgetc(fp);
+				if( b == EOF )
+				{
+					pprintf( "Error: Encountered EOF at [%i,%i]\n", y,x );
+					return false;
+				}
+				// Calculate the local pixels (+1 for ghost row,col)
+				lx = x + 1;
+				ly = y + 1;
+				ll = (ly * field_width + lx );
+				final_data[ ll ] = b;
+				
+			} // for x
+		} // for y
+		
     }
 	
-	unsigned char *final_data = (unsigned char*)malloc(local_width*local_height*sizeof(unsigned char));
     
-    for(int i = 0; i < local_height; i++){
-        for(int j = 0; j < local_width; j++){
-            final_data[(i*local_width)+j] = (unsigned char)board_ptr_b[i+1][j+1];
-        }
-    }
     
     MPI_File file;
     char fileName[13] = "output";
@@ -331,8 +435,9 @@ int main(int argc, char* argv[]) {
     
     MPI_File_set_view(file, offset, MPI_CHAR, filetype, "native", MPI_INFO_NULL);
     
-    MPI_File_write_all(file, final_data , 1,
+    MPI_File_write_all(file, &final_data[field_width+1], 1,
                        datatype, MPI_STATUS_IGNORE);
+	
     
     MPI_File_close(&file);
 	
